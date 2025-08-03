@@ -1,7 +1,0 @@
-# 固定版本的依赖文件 - 避免版本冲突
-google-generativeai==0.3.2
-flask==3.0.0
-flask-sqlalchemy==3.1.1
-apscheduler==3.10.4
-requests==2.31.0
-PySocks>=1.7.1 
