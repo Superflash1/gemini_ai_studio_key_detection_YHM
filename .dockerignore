@@ -1,0 +1,68 @@
+# Git相关
+.git
+.gitignore
+.gitattributes
+
+# Python相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统相关
+.DS_Store
+Thumbs.db
+
+# 项目特定文件
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# 文档和图片
+*.md
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# 其他版本目录（只需要v4.0）
+v1.0/
+v2.0/
+v3.0/
+new/
+api-key/
+教学文档/
+
+# 测试文件
+test_*.py
+*_test.py
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# Docker相关
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# 实例和上传文件
+instance/
+uploads/
+logs/ 
