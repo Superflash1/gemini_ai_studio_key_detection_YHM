@@ -15,18 +15,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖（优化版本）
+# 安装系统依赖（修复版本）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     curl \
+    python3-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# 复制requirements.txt并安装Python依赖（优化版本）
+# 复制requirements.txt并安装Python依赖（修复版本）
 COPY v4.0/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip cache purge
+    pip install --no-cache-dir -r requirements.txt
 
 # 复制v4.0目录的所有应用代码
 COPY v4.0/ .

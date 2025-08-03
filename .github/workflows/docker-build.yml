@@ -40,10 +40,11 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
+          type=ref,event=branch,suffix=-stable
+          type=ref,event=pr,suffix=-stable
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=stable,enable={{is_default_branch}}
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Set up Docker Buildx
@@ -67,7 +68,7 @@ jobs:
         echo "### 📦 镜像信息" >> $GITHUB_STEP_SUMMARY
         echo "- **镜像仓库**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- **构建时间**: \`$(date)\`" >> $GITHUB_STEP_SUMMARY
-        echo "- **支持架构**: \`linux/amd64\`, \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **支持架构**: \`linux/amd64\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🚀 使用方法" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
