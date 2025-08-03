@@ -6,7 +6,6 @@ valid_keys.txt
 invalid_keys.txt
 
 # 数据库和实例文件
-instance/
 *.db
 *.sqlite
 *.sqlite3
