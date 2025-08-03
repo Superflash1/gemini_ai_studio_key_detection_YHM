@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制并安装Python依赖
-COPY v4.0/requirements.txt /tmp/
+COPY v3.0/requirements.txt /tmp/
 RUN pip install --user -r /tmp/requirements.txt
 
 # 生产阶段
@@ -40,7 +40,7 @@ COPY --from=builder /root/.local /root/.local
 WORKDIR /app
 
 # 复制应用代码
-COPY v4.0/ .
+COPY v3.0/ .
 
 # 创建必要目录
 RUN mkdir -p instance logs && \
