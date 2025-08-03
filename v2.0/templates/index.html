@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini API Key Checker - 密钥检测管理系统</title>
+    <!-- Bootstrap CSS 主CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" onerror="this.onerror=null; document.head.appendChild(Object.assign(document.createElement('link'), {rel:'stylesheet', href:'/static/css/local-bootstrap.css'}));">
+    <!-- Bootstrap 图标 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet" onerror="this.onerror=null; console.log('Bootstrap图标CDN加载失败，使用本地emoji备用方案');">
+    <!-- 备用CDN -->
+    <link href="https://unpkg.com/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" onerror="this.remove();">
+    <!-- 本地备用样式 -->
+    <link href="/static/css/local-bootstrap.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .navbar-brand { font-weight: bold; }
+        .card { box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
+        .log-container { 
+            height: 400px; 
+            overflow-y: auto; 
+            background: #000; 
+            color: #fff; 
+            font-family: 'Courier New', monospace; 
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .log-entry { margin-bottom: 5px; }
+        .log-info { color: #17a2b8; }
+        .log-error { color: #dc3545; }
+        .log-success { color: #28a745; }
+        .log-progress { 
+            color: #0d6efd; 
+            font-family: 'Courier New', monospace; 
+            font-weight: bold; 
+            background-color: #f8f9fa; 
+            padding: 2px 6px; 
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status-badge { font-size: 0.8em; }
+        .key-display { 
+            font-family: 'Courier New', monospace; 
+            word-break: break-all;
+        }
+        .stats-card { text-align: center; }
+        .form-floating textarea { min-height: 120px; }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-key"></i> Gemini API Key Checker
+            </span>
+            <span class="navbar-text">
+                <small id="statusText">系统运行中...</small>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- 左侧控制面板 -->
+            <div class="col-md-4">
+                <!-- 统计信息 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart"></i> 统计信息</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4 stats-card">
+                                <h4 class="text-success" id="validCount">{{ stats.valid_count }}</h4>
+                                <small class="text-muted">有效密钥</small>
+                            </div>
+                            <div class="col-4 stats-card">
+                                <h4 class="text-danger" id="invalidCount">{{ stats.invalid_count }}</h4>
+                                <small class="text-muted">无效密钥</small>
+                            </div>
+                            <div class="col-4 stats-card">
+                                <h4 class="text-warning" id="pendingCount">{{ stats.pending_count }}</h4>
+                                <small class="text-muted">待检测</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 添加密钥 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> 添加密钥</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="addKeyForm">
+                            <div class="form-floating mb-3">
+                                <textarea class="form-control" id="newKeys" placeholder="请输入密钥"></textarea>
+                                <label for="newKeys">密钥列表（每行一个）</label>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle"></i> 添加并检测
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="checkAllKeys()">
+                                    <i class="bi bi-arrow-clockwise"></i> 按策略检测密钥
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 定时设置 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-clock"></i> 定时设置</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="scheduleForm">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="intervalMinutes" 
+                                       value="{{ settings.check_interval or 60 }}" min="0" step="1">
+                                <label for="intervalMinutes">检测间隔（分钟，0=禁用）</label>
+                            </div>
+                            
+                            <!-- API端点设置 -->
+                            <div class="mb-3">
+                                <label class="form-label">🌐 API端点设置</label>
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="apiUrl" 
+                                           value="{{ settings.api_url or '' }}" 
+                                           placeholder="留空使用Google官方API">
+                                    <label for="apiUrl">自定义API URL</label>
+                                </div>
+                                <div class="form-text">
+                                    留空默认使用Google官方API端点，支持自定义API服务器
+                                </div>
+                            </div>
+                            
+                            <!-- 代理设置 -->
+                            <div class="mb-3">
+                                <label class="form-label">🔗 代理设置</label>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="useProxy" 
+                                           {{ 'checked' if settings.use_proxy != 'false' else '' }}>
+                                    <label class="form-check-label" for="useProxy">
+                                        启用代理
+                                    </label>
+                                </div>
+                                <div class="form-floating" id="proxyUrlContainer">
+                                    <input type="text" class="form-control" id="proxyUrl" 
+                                           value="{{ settings.proxy_url or 'http://127.0.0.1:7890' }}">
+                                    <label for="proxyUrl">代理地址</label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="concurrency" 
+                                       value="{{ settings.concurrency or 10 }}" min="1" max="100" step="1">
+                                <label for="concurrency">并发检测数（1-100）</label>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <select class="form-select" id="checkStrategy">
+                                    <option value="all" {{ 'selected' if settings.check_strategy == 'all' else '' }}>
+                                        全量检测（有效+待检测密钥）
+                                    </option>
+                                    <option value="incremental" {{ 'selected' if settings.check_strategy == 'incremental' else '' }}>
+                                        增量检测（24小时内未检测的有效密钥）
+                                    </option>
+                                </select>
+                                <label for="checkStrategy">检测策略</label>
+                            </div>
+                            
+                            <!-- 邮件通知设置 -->
+                            <div class="mb-3">
+                                <label class="form-label">📧 邮件通知设置</label>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="emailEnabled" 
+                                           {{ 'checked' if settings.email_enabled == 'true' else '' }}>
+                                    <label class="form-check-label" for="emailEnabled">
+                                        启用邮件通知
+                                    </label>
+                                </div>
+                                <div id="emailConfigContainer">
+                                    <!-- 邮箱数量显示 -->
+                                    <div class="mb-2">
+                                        <small class="text-muted">已设置邮箱数量: <span id="emailCount" class="badge bg-secondary">0</span></small>
+                                    </div>
+                                    
+                                    <!-- 3个平等的邮箱配置 -->
+                                    <div class="form-floating mb-2">
+                                        <input type="email" class="form-control email-input" id="email1" 
+                                               value="{{ settings.email1 or '' }}" 
+                                               placeholder="邮箱地址1">
+                                        <label for="email1">邮箱地址1</label>
+                                    </div>
+                                    
+                                    <div class="form-floating mb-2">
+                                        <input type="email" class="form-control email-input" id="email2" 
+                                               value="{{ settings.email2 or '' }}" 
+                                               placeholder="邮箱地址2">
+                                        <label for="email2">邮箱地址2</label>
+                                    </div>
+                                    
+                                    <div class="form-floating mb-2">
+                                        <input type="email" class="form-control email-input" id="email3" 
+                                               value="{{ settings.email3 or '' }}" 
+                                               placeholder="邮箱地址3">
+                                        <label for="email3">邮箱地址3</label>
+                                    </div>
+                                    
+                                    <div class="form-floating mb-2">
+                                        <input type="password" class="form-control" id="emailPassword" 
+                                               value="{{ settings.email_password or '' }}" 
+                                               placeholder="Gmail应用密码">
+                                        <label for="emailPassword">Gmail应用密码</label>
+                                    </div>
+                                    <div class="d-grid gap-2 mb-2">
+                                        <button type="button" class="btn btn-outline-info btn-sm" onclick="sendTestEmail()">
+                                            <i class="bi bi-envelope-check"></i> 发送测试邮件（已设置的邮箱）
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text">
+                                    发送邮箱: aa1xuyuhuayhm@gmail.com<br>
+                                    需要在Gmail中生成应用密码用于SMTP认证
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-gear"></i> 保存设置
+                                </button>
+                                <button id="check-all-btn" type="button" class="btn btn-primary" onclick="checkAllKeys()">
+                                    🔍 检测所有密钥
+                                </button>
+                                <button id="force-check-btn" type="button" class="btn btn-warning" onclick="checkAllKeys(true)">
+                                    🔥 强制全量检测
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧主要内容 -->
+            <div class="col-md-8">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">📊 统计信息</h5>
+                                <div id="stats-content">
+                                    <p class="mb-1">总密钥数: <span id="total-keys">{{ stats.total }}</span></p>
+                                    <p class="mb-1">有效密钥: <span id="valid-keys" class="text-success">{{ stats.valid }}</span></p>
+                                    <p class="mb-1">无效密钥: <span id="invalid-keys" class="text-danger">{{ stats.invalid }}</span></p>
+                                    <p class="mb-0">待检测: <span id="pending-keys" class="text-warning">{{ stats.pending }}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">🔍 检测状态</h5>
+                                <div id="check-status-content">
+                                    <div id="status-idle" class="text-muted">
+                                        <i class="bi bi-check-circle"></i> 空闲状态
+                                    </div>
+                                    <div id="status-checking" class="text-primary d-none">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                                <div>
+                                                    <div id="check-type">正在检测...</div>
+                                                    <small id="check-duration" class="text-muted">运行时间: 0秒</small>
+                                                    <div id="stop-status" class="text-warning d-none">
+                                                        <small><i class="bi bi-exclamation-triangle"></i> 正在停止...</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button id="stop-check-btn" type="button" class="btn btn-danger btn-sm" onclick="stopChecking()">
+                                                <i class="bi bi-stop-fill"></i> 停止
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实时日志 -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-terminal"></i> 实时日志</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">
+                                <i class="bi bi-trash"></i> 清空
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="scrollToBottom()">
+                                <i class="bi bi-arrow-down"></i> 滚动到底部
+                            </button>
+                            <small class="text-muted ms-2" id="logStatus">日志流连接中...</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="logContainer" class="log-container"></div>
+                    </div>
+                </div>
+
+                <!-- 密钥列表 -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list"></i> 密钥列表</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-success" onclick="copyValidKeys('lines')" title="复制有效密钥（换行分隔）">
+                                <i class="bi bi-copy"></i> 复制有效密钥
+                            </button>
+                            <button class="btn btn-sm btn-outline-success dropdown-toggle dropdown-toggle-split" 
+                                    id="copyDropdownToggle" onclick="toggleCopyDropdown(event)" aria-expanded="false">
+                                <span class="visually-hidden">Toggle Dropdown</span>
+                            </button>
+                            <div class="dropdown-menu" id="copyDropdownMenu" style="display: none;">
+                                <a class="dropdown-item" href="#" onclick="copyValidKeys('lines'); hideCopyDropdown();">
+                                    <i class="bi bi-list-ul"></i> 换行分隔格式
+                                </a>
+                                <a class="dropdown-item" href="#" onclick="copyValidKeys('comma'); hideCopyDropdown();">
+                                    <i class="bi bi-list"></i> 逗号分隔格式
+                                </a>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="refreshKeyList()">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>密钥</th>
+                                        <th>状态</th>
+                                        <th>最后检测</th>
+                                        <th>错误信息</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="keyTableBody">
+                                    <!-- 动态内容 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" onerror="console.log('Bootstrap JS CDN加载失败')"></script>
+    <!-- 备用CDN -->
+    <script src="https://unpkg.com/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" onerror="this.remove()"></script>
+    <!-- 应用修复脚本 -->
+    <script src="/static/js/app-fixes.js"></script>
+    <script>
+        // 全局变量
+        let eventSource = null;
+        let logContainer = document.getElementById('logContainer');
+        let isCheckingGlobal = false;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initEventSource();
+            refreshKeyList();
+            
+            // 绑定表单事件
+            document.getElementById('addKeyForm').addEventListener('submit', addKeys);
+            document.getElementById('scheduleForm').addEventListener('submit', saveSettings);
+            
+            // 代理开关控制
+            const useProxyCheckbox = document.getElementById('useProxy');
+            const proxyUrlContainer = document.getElementById('proxyUrlContainer');
+            
+            function updateProxyVisibility() {
+                if (useProxyCheckbox.checked) {
+                    proxyUrlContainer.style.display = 'block';
+                    proxyUrlContainer.style.opacity = '1';
+                } else {
+                    proxyUrlContainer.style.display = 'block';
+                    proxyUrlContainer.style.opacity = '0.5';
+                    document.getElementById('proxyUrl').disabled = true;
+                }
+                // 恢复启用状态
+                if (useProxyCheckbox.checked) {
+                    document.getElementById('proxyUrl').disabled = false;
+                }
+            }
+            
+            useProxyCheckbox.addEventListener('change', updateProxyVisibility);
+            updateProxyVisibility(); // 初始化状态
+            
+            // 邮件开关控制
+            const emailEnabledCheckbox = document.getElementById('emailEnabled');
+            const emailConfigContainer = document.getElementById('emailConfigContainer');
+            
+            function updateEmailVisibility() {
+                const emailInputs = document.querySelectorAll('.email-input');
+                if (emailEnabledCheckbox.checked) {
+                    emailConfigContainer.style.display = 'block';
+                    emailConfigContainer.style.opacity = '1';
+                    emailInputs.forEach(input => input.disabled = false);
+                    document.getElementById('emailPassword').disabled = false;
+                } else {
+                    emailConfigContainer.style.display = 'block';
+                    emailConfigContainer.style.opacity = '0.5';
+                    emailInputs.forEach(input => input.disabled = true);
+                    document.getElementById('emailPassword').disabled = true;
+                }
+            }
+            
+            emailEnabledCheckbox.addEventListener('change', updateEmailVisibility);
+            updateEmailVisibility(); // 初始化状态
+            
+            // 设置定时刷新
+            setInterval(refreshKeyList, 10000);  // 每10秒刷新一次
+            setInterval(updateStats, 10000);      // 每10秒更新统计
+            
+            // 启动状态监控
+            checkStatus();
+            setInterval(checkStatus, 2000); // 每2秒检查一次状态
+            
+            // 启动统计信息更新
+            setInterval(loadStats, 10000); // 每10秒更新一次统计
+            
+            // 初始化邮箱数量显示和监听
+            updateEmailCount();
+            document.querySelectorAll('.email-input').forEach(input => {
+                input.addEventListener('input', updateEmailCount);
+            });
+        });
+
+        // 初始化 Server-Sent Events
+        function initEventSource() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource('/logs');
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (!data.heartbeat) {
+                        addLogEntry(data);
+                    }
+                } catch (e) {
+                    console.error('解析日志数据失败:', e, event.data);
+                }
+            };
+            
+            eventSource.onopen = function(event) {
+                console.log('日志流连接已建立');
+                document.getElementById('statusText').textContent = '系统运行中 - 日志流已连接';
+                document.getElementById('logStatus').textContent = '已连接';
+                document.getElementById('logStatus').className = 'text-success ms-2';
+            };
+            
+            eventSource.onerror = function(event) {
+                console.log('日志流连接错误，5秒后重连...');
+                document.getElementById('statusText').textContent = '系统运行中 - 日志流连接中断';
+                document.getElementById('logStatus').textContent = '重连中...';
+                document.getElementById('logStatus').className = 'text-warning ms-2';
+                eventSource.close();
+                setTimeout(initEventSource, 5000);
+            };
+        }
+
+        // 添加日志条目
+        function addLogEntry(logData) {
+            // 检查是否是可更新的日志（如进度条）
+            if (logData.is_update && logData.update_id) {
+                updateLogEntry(logData);
+                return;
+            }
+            
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            
+            let levelClass = 'log-info';
+            if (logData.level === 'ERROR') levelClass = 'log-error';
+            else if (logData.message.includes('✅')) levelClass = 'log-success';
+            else if (logData.message.includes('📊 进度:')) levelClass = 'log-progress';
+            
+            logDiv.innerHTML = `<span class="text-muted">[${logData.timestamp}]</span> <span class="${levelClass}">${escapeHtml(logData.message)}</span>`;
+            
+            logContainer.appendChild(logDiv);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // 如果是检测相关的日志，立即更新统计
+            if (logData.message.includes('检测') || logData.message.includes('📊 进度:') || logData.message.includes('🎉')) {
+                setTimeout(updateStats, 500); // 延迟500ms更新统计
+            }
+            
+            // 限制日志条目数量
+            while (logContainer.children.length > 1000) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        // 更新可更新的日志条目
+        function updateLogEntry(logData) {
+            // 查找具有相同update_id的日志条目
+            const existingEntry = document.querySelector(`[data-update-id="${logData.update_id}"]`);
+            
+            if (existingEntry) {
+                // 更新现有条目
+                let levelClass = 'log-info';
+                if (logData.level === 'ERROR') levelClass = 'log-error';
+                else if (logData.message.includes('✅')) levelClass = 'log-success';
+                else if (logData.message.includes('📊 进度:')) levelClass = 'log-progress';
+                
+                existingEntry.innerHTML = `<span class="text-muted">[${logData.timestamp}]</span> <span class="${levelClass}">${escapeHtml(logData.message)}</span>`;
+                
+                // 如果是检测相关的日志，立即更新统计
+                if (logData.message.includes('📊 进度:')) {
+                    setTimeout(updateStats, 500);
+                }
+            } else {
+                // 如果找不到现有条目，创建新的（第一次）
+                const logDiv = document.createElement('div');
+                logDiv.className = 'log-entry';
+                logDiv.setAttribute('data-update-id', logData.update_id);
+                
+                let levelClass = 'log-progress'; // 可更新的通常是进度条
+                logDiv.innerHTML = `<span class="text-muted">[${logData.timestamp}]</span> <span class="${levelClass}">${escapeHtml(logData.message)}</span>`;
+                
+                logContainer.appendChild(logDiv);
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                setTimeout(updateStats, 500);
+            }
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 清空日志
+        function clearLogs() {
+            logContainer.innerHTML = '';
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // 添加密钥
+        async function addKeys(event) {
+            event.preventDefault();
+            
+            const textarea = document.getElementById('newKeys');
+            const keys = textarea.value.trim().split('\n').filter(key => key.trim());
+            
+            if (keys.length === 0) {
+                alert('请输入至少一个密钥');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keys: keys })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    textarea.value = '';
+                    // 立即刷新界面
+                    setTimeout(() => {
+                        refreshKeyList();
+                        updateStats();
+                    }, 1000);  // 延迟1秒让检测开始
+                    
+                    // 显示成功消息
+                    addLogEntry({
+                        timestamp: new Date().toLocaleString(),
+                        level: 'INFO',
+                        message: `已添加 ${result.added_count} 个密钥，开始检测...`
+                    });
+                } else {
+                    alert('添加失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('添加失败: ' + error.message);
+            }
+        }
+
+        // 保存设置
+        async function saveSettings(event) {
+            event.preventDefault();
+            
+            const intervalMinutes = parseInt(document.getElementById('intervalMinutes').value);
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const useProxy = document.getElementById('useProxy').checked;
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            const concurrency = parseInt(document.getElementById('concurrency').value);
+            const checkStrategy = document.getElementById('checkStrategy').value;
+            const emailEnabled = document.getElementById('emailEnabled').checked;
+            const email1 = document.getElementById('email1').value.trim();
+            const email2 = document.getElementById('email2').value.trim();
+            const email3 = document.getElementById('email3').value.trim();
+            const emailPassword = document.getElementById('emailPassword').value;
+            
+            // 验证并发数范围
+            if (concurrency < 1 || concurrency > 100) {
+                alert('并发数必须在 1-100 之间');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        check_interval: intervalMinutes,
+                        api_url: apiUrl,
+                        use_proxy: useProxy ? 'true' : 'false',
+                        proxy_url: proxyUrl,
+                        concurrency: concurrency,
+                        check_strategy: checkStrategy,
+                        email_enabled: emailEnabled ? 'true' : 'false',
+                        email1: email1,
+                        email2: email2,
+                        email3: email3,
+                        email_password: emailPassword
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('设置已保存');
+                    const strategyText = checkStrategy === 'all' ? '全量检测' : '增量检测';
+                    const apiText = apiUrl ? `自定义API: ${apiUrl}` : '使用Google官方API';
+                    const proxyText = useProxy ? `代理: ${proxyUrl}` : '不使用代理';
+                    const emailCount = getConfiguredEmailCount();
+                    const emailText = emailEnabled ? `邮件通知: ${emailCount}个邮箱` : '邮件通知: 已禁用';
+                    // 显示设置更新的日志
+                    addLogEntry({
+                        timestamp: new Date().toLocaleString(),
+                        level: 'INFO',
+                        message: `⚙️ 设置已更新 - 检测间隔: ${intervalMinutes}分钟, ${apiText}, ${proxyText}, ${emailText}, 并发数: ${concurrency}, 策略: ${strategyText}`
+                    });
+                } else {
+                    alert('保存失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        // 检测所有密钥
+        function checkAllKeys(forceAll = false) {
+            // 检查当前状态
+            if (isCheckingGlobal) {
+                showAlert('检测被跳过：另一个检测进程正在运行中', 'warning');
+                return;
+            }
+            
+            const url = '/api/check-all';
+            const data = { force_all: forceAll };
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    // 立即检查状态
+                    setTimeout(checkStatus, 100);
+                } else {
+                    showAlert(data.message, data.is_checking ? 'warning' : 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('检测请求失败', 'danger');
+            });
+        }
+
+        // 检测单个密钥
+        function checkSingleKey(keyValue) {
+            // 检查当前状态
+            if (isCheckingGlobal) {
+                showAlert('检测被跳过：另一个检测进程正在运行中', 'warning');
+                return;
+            }
+            
+            fetch('/api/check-single', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ key: keyValue })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    // 立即检查状态
+                    setTimeout(checkStatus, 100);
+                } else {
+                    showAlert(data.message, data.is_checking ? 'warning' : 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('检测请求失败', 'danger');
+            });
+        }
+
+        // 刷新密钥列表
+        async function refreshKeyList() {
+            try {
+                const response = await fetch('/api/keys');
+                const keys = await response.json();
+                
+                const tbody = document.getElementById('keyTableBody');
+                tbody.innerHTML = '';
+                
+                keys.forEach(key => {
+                    const row = document.createElement('tr');
+                    
+                    let statusBadge = '';
+                    switch (key.status) {
+                        case 'valid':
+                            statusBadge = '<span class="badge bg-success status-badge">有效</span>';
+                            break;
+                        case 'invalid':
+                            statusBadge = '<span class="badge bg-danger status-badge">无效</span>';
+                            break;
+                        case 'pending':
+                            statusBadge = '<span class="badge bg-warning status-badge">待检测</span>';
+                            break;
+                        default:
+                            statusBadge = '<span class="badge bg-secondary status-badge">未知</span>';
+                    }
+                    
+                    const lastChecked = key.last_checked ? new Date(key.last_checked).toLocaleString() : '从未';
+                    const errorMessage = key.error_message || '';
+                    
+                    row.innerHTML = `
+                        <td class="key-display">${key.key_value.substring(0, 10)}...${key.key_value.substring(key.key_value.length - 4)}</td>
+                        <td>${statusBadge}</td>
+                        <td><small>${lastChecked}</small></td>
+                        <td><small class="text-danger">${errorMessage}</small></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="checkSingleKey('${key.key_value}')">
+                                <i class="bi bi-check-circle"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteKey(${key.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+                
+                updateStats();
+            } catch (error) {
+                console.error('刷新密钥列表失败:', error);
+            }
+        }
+
+        // 删除密钥
+        async function deleteKey(keyId) {
+            if (!confirm('确定要删除这个密钥吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/keys/${keyId}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.success) {
+                    refreshKeyList();
+                } else {
+                    alert('删除失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 更新统计信息
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('validCount').textContent = stats.valid_count;
+                document.getElementById('invalidCount').textContent = stats.invalid_count;
+                document.getElementById('pendingCount').textContent = stats.pending_count;
+            } catch (error) {
+                console.error('更新统计信息失败:', error);
+            }
+        }
+
+        // 检测状态监控
+        function checkStatus() {
+            fetch('/api/check-status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateCheckStatus(data.status);
+                    }
+                })
+                .catch(error => {
+                    console.error('获取检测状态失败:', error);
+                });
+        }
+        
+        // 更新检测状态显示
+        function updateCheckStatus(status) {
+            const isChecking = status.is_checking;
+            const stopRequested = status.stop_requested;
+            isCheckingGlobal = isChecking;
+            
+            // 更新状态显示
+            const idleElement = document.getElementById('status-idle');
+            const checkingElement = document.getElementById('status-checking');
+            const stopStatusElement = document.getElementById('stop-status');
+            const stopBtn = document.getElementById('stop-check-btn');
+            
+            if (isChecking) {
+                idleElement.classList.add('d-none');
+                checkingElement.classList.remove('d-none');
+                
+                // 更新检测类型和持续时间
+                document.getElementById('check-type').textContent = status.check_type || '正在检测...';
+                document.getElementById('check-duration').textContent = `运行时间: ${status.duration}秒`;
+                
+                // 处理停止状态
+                if (stopRequested) {
+                    stopStatusElement.classList.remove('d-none');
+                    stopBtn.disabled = true;
+                    stopBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 停止中';
+                } else {
+                    stopStatusElement.classList.add('d-none');
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = '<i class="bi bi-stop-fill"></i> 停止';
+                }
+            } else {
+                idleElement.classList.remove('d-none');
+                checkingElement.classList.add('d-none');
+                stopStatusElement.classList.add('d-none');
+            }
+            
+            // 更新按钮状态
+            updateButtonStates(isChecking);
+        }
+        
+        // 更新按钮状态
+        function updateButtonStates(isChecking) {
+            // 检测相关按钮
+            const checkAllBtn = document.getElementById('check-all-btn');
+            const forceCheckBtn = document.getElementById('force-check-btn');
+            
+            if (checkAllBtn) {
+                checkAllBtn.disabled = isChecking;
+                checkAllBtn.innerHTML = isChecking ? 
+                    '<span class="spinner-border spinner-border-sm me-1"></span>检测中...' : 
+                    '🔍 检测所有密钥';
+            }
+            
+            if (forceCheckBtn) {
+                forceCheckBtn.disabled = isChecking;
+                forceCheckBtn.innerHTML = isChecking ? 
+                    '<span class="spinner-border spinner-border-sm me-1"></span>检测中...' : 
+                    '🔥 强制全量检测';
+            }
+            
+            // 单个密钥检测按钮
+            const singleCheckBtns = document.querySelectorAll('.btn-check-single');
+            singleCheckBtns.forEach(btn => {
+                btn.disabled = isChecking;
+                if (isChecking) {
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                } else {
+                    btn.innerHTML = '🔍';
+                }
+            });
+        }
+
+        // 停止检测
+        function stopChecking() {
+            // 检查当前状态
+            if (!isCheckingGlobal) {
+                alert('当前没有正在进行的检测');
+                return;
+            }
+            
+            // 显示确认对话框
+            if (!confirm('确定要停止当前检测吗？已完成的检测结果将会保存。')) {
+                return;
+            }
+            
+            fetch('/api/stop-check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // 立即检查状态更新
+                    setTimeout(checkStatus, 100);
+                } else {
+                    alert('停止失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('停止请求失败');
+            });
+        }
+        
+        // 发送测试邮件
+        async function sendTestEmail() {
+            const emailPassword = document.getElementById('emailPassword').value;
+            const configuredEmails = getConfiguredEmails();
+            
+            if (configuredEmails.length === 0 || !emailPassword) {
+                alert('请至少设置一个邮箱地址并填写Gmail应用密码');
+                return;
+            }
+            
+            // 验证邮箱格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const invalidEmails = configuredEmails.filter(email => !emailRegex.test(email));
+            if (invalidEmails.length > 0) {
+                alert(`以下邮箱地址格式无效: ${invalidEmails.join(', ')}`);
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            
+            try {
+                // 显示加载状态
+                button.innerHTML = '<i class="bi bi-hourglass-split"></i> 发送中...';
+                button.disabled = true;
+                
+                const response = await fetch('/api/test-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        receiver_email: configuredEmails[0], // 传递第一个邮箱做兼容性
+                        app_password: emailPassword
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    addLogEntry({
+                        timestamp: new Date().toLocaleString(),
+                        level: 'INFO',
+                        message: `📧 ${result.message}`
+                    });
+                } else {
+                    alert('测试邮件发送失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('测试邮件发送失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+        
+        // 更新邮箱数量显示
+        function updateEmailCount() {
+            const count = getConfiguredEmailCount();
+            const countBadge = document.getElementById('emailCount');
+            countBadge.textContent = count;
+            
+            // 根据数量更新样式
+            countBadge.className = `badge ${count > 0 ? 'bg-success' : 'bg-secondary'}`;
+        }
+        
+        // 获取已配置的邮箱列表
+        function getConfiguredEmails() {
+            const emails = [];
+            for (let i = 1; i <= 3; i++) {
+                const email = document.getElementById(`email${i}`).value.trim();
+                if (email) {
+                    emails.push(email);
+                }
+            }
+            return emails;
+        }
+        
+        // 获取已配置邮箱数量
+        function getConfiguredEmailCount() {
+            return getConfiguredEmails().length;
+        }
+        
+        // 下拉菜单控制函数
+        function toggleCopyDropdown(event) {
+            event.stopPropagation();
+            const menu = document.getElementById('copyDropdownMenu');
+            const toggle = document.getElementById('copyDropdownToggle');
+            
+            if (menu.style.display === 'none' || menu.style.display === '') {
+                // 显示下拉菜单
+                menu.style.display = 'block';
+                menu.style.position = 'absolute';
+                menu.style.top = '100%';
+                menu.style.right = '0';
+                menu.style.zIndex = '1000';
+                menu.style.minWidth = '180px';
+                menu.style.backgroundColor = 'white';
+                menu.style.border = '1px solid rgba(0,0,0,.15)';
+                menu.style.borderRadius = '0.25rem';
+                menu.style.boxShadow = '0 0.5rem 1rem rgba(0,0,0,.175)';
+                menu.style.padding = '0.5rem 0';
+                menu.style.margin = '0.125rem 0 0';
+                toggle.setAttribute('aria-expanded', 'true');
+            } else {
+                // 隐藏下拉菜单
+                menu.style.display = 'none';
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+        }
+        
+        function hideCopyDropdown() {
+            const menu = document.getElementById('copyDropdownMenu');
+            const toggle = document.getElementById('copyDropdownToggle');
+            menu.style.display = 'none';
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+        
+        // 点击其他地方时隐藏下拉菜单
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.btn-group')) {
+                hideCopyDropdown();
+            }
+        });
+        
+        // 添加下拉菜单项样式
+        document.addEventListener('DOMContentLoaded', function() {
+            const style = document.createElement('style');
+            style.textContent = `
+                .dropdown-item {
+                    display: block;
+                    width: 100%;
+                    padding: 0.25rem 1rem;
+                    clear: both;
+                    font-weight: 400;
+                    color: #212529;
+                    text-align: inherit;
+                    text-decoration: none;
+                    white-space: nowrap;
+                    background-color: transparent;
+                    border: 0;
+                    cursor: pointer;
+                }
+                
+                .dropdown-item:hover {
+                    color: #1e2125;
+                    background-color: #e9ecef;
+                    text-decoration: none;
+                }
+                
+                .dropdown-item i {
+                    margin-right: 0.5rem;
+                }
+            `;
+            document.head.appendChild(style);
+        });
+        
+        // 复制有效密钥
+        async function copyValidKeys(format) {
+            try {
+                const response = await fetch(`/api/valid-keys?format=${format}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    alert('获取有效密钥失败: ' + result.message);
+                    return;
+                }
+                
+                if (result.count === 0) {
+                    alert('没有有效的密钥可复制');
+                    return;
+                }
+                
+                // 使用Clipboard API复制
+                if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(result.content);
+                    alert(`已复制 ${result.count} 个有效密钥（${format === 'comma' ? '逗号分隔' : '换行分隔'}格式）`);
+                } else {
+                    // 降级方案：创建临时文本框
+                    const textArea = document.createElement('textarea');
+                    textArea.value = result.content;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert(`已复制 ${result.count} 个有效密钥（${format === 'comma' ? '逗号分隔' : '换行分隔'}格式）`);
+                }
+            } catch (error) {
+                console.error('复制失败:', error);
+                alert('复制失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 
