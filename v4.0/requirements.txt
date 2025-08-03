@@ -1,0 +1,6 @@
+google-generativeai
+flask
+flask-sqlalchemy
+apscheduler
+requests
+PySocks>=1.7.1 
