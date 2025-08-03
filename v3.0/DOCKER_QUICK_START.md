@@ -32,7 +32,7 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -v gemini_data:/app/instance \
-  ghcr.io/your-username/gemini_ai_studio_key_detection/gemini-key-checker:latest
+  ghcr.io/your-username/gemini-key-checker:latest
 ```
 
 ## 🌐 访问应用

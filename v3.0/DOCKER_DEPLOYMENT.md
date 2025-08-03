@@ -32,7 +32,7 @@ docker-compose down
 
 ```bash
 # 拉取最新镜像
-docker pull ghcr.io/your-username/gemini_ai_studio_key_detection/gemini-key-checker:latest
+docker pull ghcr.io/your-username/gemini-key-checker:latest
 
 # 创建数据卷
 docker volume create gemini_data
@@ -43,7 +43,7 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -v gemini_data:/app/instance \
-  ghcr.io/your-username/gemini_ai_studio_key_detection/gemini-key-checker:latest
+  ghcr.io/your-username/gemini-key-checker:latest
 ```
 
 ### 方法三：本地构建
@@ -184,7 +184,7 @@ docker stop gemini-key-checker
 docker rm gemini-key-checker
 
 # 拉取最新镜像
-docker pull ghcr.io/your-username/gemini_ai_studio_key_detection/gemini-key-checker:latest
+docker pull ghcr.io/your-username/gemini-key-checker:latest
 
 # 重新运行
 docker run -d \
@@ -192,7 +192,7 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -v gemini_data:/app/instance \
-  ghcr.io/your-username/gemini_ai_studio_key_detection/gemini-key-checker:latest
+  ghcr.io/your-username/gemini-key-checker:latest
 ```
 
 ## 🛡️ 安全考虑
