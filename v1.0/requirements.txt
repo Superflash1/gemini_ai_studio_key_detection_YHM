@@ -1,8 +1,0 @@
-google-genai
-tqdm
-flask
-flask-sqlalchemy
-apscheduler
-datetime
-requests
-PySocks>=1.7.1 

@@ -42,6 +42,10 @@ class KeyChecker:
         self._stop_requested = False  # 添加停止标志
         self.current_check_id = None
         
+        # 持续检测相关属性
+        self._continuous_check_enabled = True  # 是否启用持续检测
+        self._continuous_check_interval = 30  # 持续检测间隔（秒）
+        
         # 设置日志
         self.logger = logging.getLogger('KeyChecker')
         self.logger.setLevel(logging.INFO)
@@ -201,6 +205,18 @@ class KeyChecker:
         if not self.scheduler.running:
             self.scheduler.start()
             self.logger.info("🚀 定时调度器已启动")
+            
+            # 启动持续检测任务
+            if self._continuous_check_enabled:
+                self.scheduler.add_job(
+                    func=self._continuous_check_pending_keys,
+                    trigger=IntervalTrigger(seconds=self._continuous_check_interval),
+                    id='continuous_check_job',
+                    name='持续检测待处理密钥',
+                    replace_existing=True
+                )
+                self.logger.info(f"🔄 持续检测已启用，检测间隔: {self._continuous_check_interval} 秒")
+            
             self.logger.info("💡 系统准备就绪，等待任务...")
             
             # 发送欢迎消息
@@ -421,6 +437,157 @@ class KeyChecker:
             self._check_start_time = None
             self._stop_requested = False
             self.current_check_id = None
+            self._check_lock.release()
+    
+    def _continuous_check_pending_keys(self):
+        """持续检测pending状态的密钥"""
+        # 如果已经有检测在进行，跳过
+        if self._is_checking:
+            return
+            
+        try:
+            with self.app.app_context():
+                # 查找pending状态的密钥数量
+                pending_count = ApiKey.query.filter_by(status='pending').count()
+                
+                if pending_count > 0:
+                    # 有待检测的密钥，触发检测
+                    self.logger.info(f"🔍 发现 {pending_count} 个待检测密钥，自动启动检测...")
+                    
+                    # 异步启动检测，避免阻塞持续检测任务
+                    threading.Thread(
+                        target=self._check_pending_keys_async,
+                        daemon=True
+                    ).start()
+                    
+        except Exception as e:
+            self.logger.error(f"持续检测过程中发生错误: {str(e)}")
+    
+    def _check_pending_keys_async(self):
+        """异步检测所有pending状态的密钥"""
+        # 检查是否已有检测在进行
+        if not self._check_lock.acquire(blocking=False):
+            return  # 如果有其他检测在进行，直接返回
+        
+        try:
+            # 设置检测状态
+            self._is_checking = True
+            self._current_check_type = "持续检测（pending密钥）"
+            self._check_start_time = datetime.now()
+            self._stop_requested = False
+            
+            with self.app.app_context():
+                try:
+                    # 获取设置
+                    proxy_setting = Settings.query.filter_by(key='proxy_url').first()
+                    proxy_url = proxy_setting.value if proxy_setting else "http://127.0.0.1:7890"
+                    
+                    use_proxy_setting = Settings.query.filter_by(key='use_proxy').first()
+                    use_proxy = use_proxy_setting.value.lower() == 'true' if use_proxy_setting else True
+                    
+                    api_url_setting = Settings.query.filter_by(key='api_url').first()
+                    api_url = api_url_setting.value if api_url_setting else ""
+                    
+                    concurrency_setting = Settings.query.filter_by(key='concurrency').first()
+                    concurrency = int(concurrency_setting.value) if concurrency_setting else 10
+                    
+                    # 只获取pending状态的密钥
+                    keys_to_check = ApiKey.query.filter_by(status='pending').all()
+                    
+                    if not keys_to_check:
+                        return
+                    
+                    self.logger.info(f"🔍 开始检测 {len(keys_to_check)} 个待检测密钥，并发数: {concurrency}")
+                    
+                    valid_count = 0
+                    invalid_count = 0
+                    processed_count = 0
+                    total_count = len(keys_to_check)
+                    
+                    # 生成唯一的检测会话ID
+                    import uuid
+                    self.current_check_id = f"continuous_{uuid.uuid4().hex[:8]}"
+                    
+                    # 显示初始进度条
+                    self._log_progress_update(0, total_count, 0, 0)
+                    
+                    # 使用线程池并发检测
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+                        # 提交所有检测任务
+                        future_to_key = {
+                            executor.submit(check_key, api_key.key_value, proxy_url, use_proxy, api_url): api_key 
+                            for api_key in keys_to_check
+                        }
+                        
+                        # 处理完成的任务
+                        for future in concurrent.futures.as_completed(future_to_key):
+                            # 检查停止请求
+                            if self._stop_requested:
+                                self.logger.warning(f"🛑 持续检测被停止！已处理 {processed_count}/{total_count} 个密钥")
+                                break
+                            
+                            api_key = future_to_key[future]
+                            try:
+                                is_valid, message = future.result()
+                                
+                                # 更新密钥状态
+                                api_key.status = 'valid' if is_valid else 'invalid'
+                                api_key.last_checked = datetime.utcnow()
+                                api_key.error_message = None if is_valid else message
+                                
+                                # 创建检测记录
+                                check_log = CheckLog(
+                                    api_key_id=api_key.id,
+                                    status='valid' if is_valid else 'invalid',
+                                    message=message
+                                )
+                                db.session.add(check_log)
+                                
+                                processed_count += 1
+                                if is_valid:
+                                    valid_count += 1
+                                else:
+                                    invalid_count += 1
+                                
+                                # 更新进度条
+                                self._log_progress_update(processed_count, total_count, valid_count, invalid_count)
+                                    
+                            except Exception as exc:
+                                # 处理单个检测的异常
+                                api_key.status = 'invalid'
+                                api_key.last_checked = datetime.utcnow()
+                                api_key.error_message = f"检测异常: {str(exc)}"
+                                
+                                check_log = CheckLog(
+                                    api_key_id=api_key.id,
+                                    status='invalid',
+                                    message=f"检测异常: {str(exc)}"
+                                )
+                                db.session.add(check_log)
+                                
+                                processed_count += 1
+                                invalid_count += 1
+                                
+                                # 更新进度条
+                                self._log_progress_update(processed_count, total_count, valid_count, invalid_count)
+                    
+                    db.session.commit()
+                    
+                    # 检查是否被停止
+                    if self._stop_requested:
+                        self.logger.info(f"🛑 持续检测已停止！部分完成: {processed_count}/{total_count} 个密钥，有效: {valid_count} 个，无效: {invalid_count} 个")
+                    else:
+                        self.logger.info(f"✅ 持续检测完成！总计: {processed_count} 个，有效: {valid_count} 个，无效: {invalid_count} 个")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    self.logger.error(f"持续检测过程中发生错误: {str(e)}")
+        finally:
+            # 清除检测状态
+            self._is_checking = False
+            self._current_check_type = None
+            self._check_start_time = None
+            self._stop_requested = False
             self._check_lock.release()
     
     def check_single_key(self, key_value):

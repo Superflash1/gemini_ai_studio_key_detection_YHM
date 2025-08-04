@@ -84,6 +84,14 @@
                                 <small class="text-muted">待检测</small>
                             </div>
                         </div>
+                        <!-- 添加删除无效密钥按钮 -->
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="deleteInvalidKeys()" id="deleteInvalidBtn">
+                                    <i class="bi bi-trash"></i> 删除所有无效密钥
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -96,7 +104,15 @@
                         <form id="addKeyForm">
                             <div class="form-floating mb-3">
                                 <textarea class="form-control" id="newKeys" placeholder="请输入密钥"></textarea>
-                                <label for="newKeys">密钥列表（每行一个）</label>
+                                <label for="newKeys">密钥列表（支持多种格式）</label>
+                            </div>
+                            <div class="form-text mb-3">
+                                <small class="text-muted">
+                                    💡 支持格式：<br>
+                                    • 每行一个密钥（推荐）<br>
+                                    • 逗号分隔：key1,key2,key3<br>
+                                    • 自动去除多余空格和末尾逗号
+                                </small>
                             </div>
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary">
@@ -563,9 +579,9 @@
             event.preventDefault();
             
             const textarea = document.getElementById('newKeys');
-            const keys = textarea.value.trim().split('\n').filter(key => key.trim());
+            const keysText = textarea.value.trim();
             
-            if (keys.length === 0) {
+            if (!keysText) {
                 alert('请输入至少一个密钥');
                 return;
             }
@@ -574,7 +590,7 @@
                 const response = await fetch('/api/keys', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ keys: keys })
+                    body: JSON.stringify({ keys: keysText })  // 直接发送字符串，让后端处理
                 });
                 
                 const result = await response.json();
@@ -590,13 +606,72 @@
                     addLogEntry({
                         timestamp: new Date().toLocaleString(),
                         level: 'INFO',
-                        message: `已添加 ${result.added_count} 个密钥，开始检测...`
+                        message: `✅ 已添加 ${result.added_count} 个密钥，${result.duplicate_count} 个重复，开始检测...`
                     });
                 } else {
                     alert('添加失败: ' + result.message);
                 }
             } catch (error) {
                 alert('添加失败: ' + error.message);
+            }
+        }
+
+        // 删除无效密钥
+        async function deleteInvalidKeys() {
+            // 获取当前无效密钥数量
+            const invalidCountElement = document.getElementById('invalidCount');
+            const invalidCount = parseInt(invalidCountElement.textContent) || 0;
+            
+            if (invalidCount === 0) {
+                alert('没有无效密钥需要删除');
+                return;
+            }
+            
+            // 确认删除
+            if (!confirm(`确定要删除所有 ${invalidCount} 个无效密钥吗？此操作不可撤销。`)) {
+                return;
+            }
+            
+            const button = document.getElementById('deleteInvalidBtn');
+            const originalText = button.innerHTML;
+            
+            try {
+                // 显示加载状态
+                button.innerHTML = '<i class="bi bi-hourglass-split"></i> 删除中...';
+                button.disabled = true;
+                
+                const response = await fetch('/api/keys/delete-invalid', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    // 立即刷新界面
+                    refreshKeyList();
+                    updateStats();
+                    
+                    // 显示成功消息
+                    addLogEntry({
+                        timestamp: new Date().toLocaleString(),
+                        level: 'INFO',
+                        message: `🗑️ ${result.message}`
+                    });
+                    
+                    if (result.deleted_count > 0) {
+                        alert(`成功删除 ${result.deleted_count} 个无效密钥`);
+                    } else {
+                        alert('没有找到无效密钥');
+                    }
+                } else {
+                    alert('删除失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                button.innerHTML = originalText;
+                button.disabled = false;
             }
         }
 

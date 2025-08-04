@@ -105,16 +105,46 @@ def add_keys():
     """添加新密钥"""
     try:
         data = request.get_json()
-        keys = data.get('keys', [])
+        keys_input = data.get('keys', [])
+        
+        # 解析多种输入格式的密钥
+        parsed_keys = []
+        
+        if isinstance(keys_input, list):
+            # 如果是数组，按原逻辑处理
+            for key_value in keys_input:
+                key_value = str(key_value).strip()
+                if key_value:
+                    parsed_keys.append(key_value)
+        elif isinstance(keys_input, str):
+            # 如果是字符串，支持多种分隔方式
+            keys_text = keys_input.strip()
+            
+            # 去除末尾的逗号
+            if keys_text.endswith(','):
+                keys_text = keys_text[:-1]
+            
+            # 检测分隔方式：如果包含换行符，按行分割；否则按逗号分割
+            if '\n' in keys_text:
+                # 按行分割，每行一个密钥
+                raw_keys = keys_text.split('\n')
+            else:
+                # 按逗号分割
+                raw_keys = keys_text.split(',')
+            
+            # 清理和过滤密钥
+            for key_value in raw_keys:
+                key_value = key_value.strip()
+                # 去除每个密钥末尾可能的逗号
+                if key_value.endswith(','):
+                    key_value = key_value[:-1].strip()
+                if key_value:
+                    parsed_keys.append(key_value)
         
         added_count = 0
         duplicate_count = 0
         
-        for key_value in keys:
-            key_value = key_value.strip()
-            if not key_value:
-                continue
-                
+        for key_value in parsed_keys:
             # 检查是否已存在
             existing = ApiKey.query.filter_by(key_value=key_value).first()
             if existing:
@@ -132,7 +162,7 @@ def add_keys():
         if added_count > 0:
             threading.Thread(
                 target=check_new_keys_async, 
-                args=(keys,)
+                args=(parsed_keys,)
             ).start()
         
         return jsonify({
@@ -154,6 +184,38 @@ def delete_key(key_id):
         db.session.delete(key)
         db.session.commit()
         return jsonify({'success': True, 'message': '密钥已删除'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/keys/delete-invalid', methods=['POST'])
+def delete_invalid_keys():
+    """批量删除无效密钥"""
+    try:
+        # 查找所有状态为invalid的密钥
+        invalid_keys = ApiKey.query.filter_by(status='invalid').all()
+        
+        if not invalid_keys:
+            return jsonify({
+                'success': True,
+                'message': '没有找到无效密钥',
+                'deleted_count': 0
+            })
+        
+        deleted_count = len(invalid_keys)
+        
+        # 批量删除无效密钥（关联的检测日志会因为cascade='all, delete-orphan'自动删除）
+        for key in invalid_keys:
+            db.session.delete(key)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功删除 {deleted_count} 个无效密钥',
+            'deleted_count': deleted_count
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
