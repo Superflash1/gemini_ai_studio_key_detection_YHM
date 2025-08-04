@@ -37,9 +37,12 @@ COPY --from=builder /root/.local /home/appuser/.local
 # 复制应用代码
 COPY . .
 
-# 创建数据目录并设置权限
+# 创建数据目录并设置权限（在切换用户前设置）
 RUN mkdir -p /app/instance && \
-    chown -R appuser:appuser /app
+    chmod 755 /app && \
+    chmod 775 /app/instance && \
+    chown -R appuser:appuser /app && \
+    chmod g+s /app/instance
 
 # 切换到非root用户
 USER appuser
