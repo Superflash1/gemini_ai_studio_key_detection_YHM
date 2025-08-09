@@ -1,0 +1,136 @@
+/* 视觉主题：轻玻璃拟态 + 渐变色点缀 */
+:root {
+  --brand-gradient: linear-gradient(135deg, #6d83f2 0%, #8a7cf6 50%, #a16cf4 100%);
+  --bg-surface: #f3f6fb;
+  --glass-bg: rgba(255,255,255,.6);
+  --glass-blur: 10px;
+  --card-shadow: 0 12px 30px rgba(17, 24, 39, .08);
+
+  --btn-radius: 12px;
+  --btn-height: 44px;
+  --btn-shadow: 0 10px 18px rgba(17, 24, 39, .08);
+
+  --c-primary-1: #5b67f1;
+  --c-primary-2: #8b78f6;
+  --c-secondary-1: #6b7280;
+  --c-secondary-2: #4b5563;
+  --c-success-1: #22c55e;
+  --c-success-2: #16a34a;
+  --c-info-1: #06b6d4;
+  --c-info-2: #0891b2;
+  --c-warning-1: #f59e0b;
+  --c-warning-2: #d97706;
+  --c-danger-1: #ef4444;
+  --c-danger-2: #dc2626;
+}
+
+body { background: var(--bg-surface); }
+
+.navbar { background: var(--brand-gradient) !important; }
+
+/* 玻璃拟态容器 */
+.glass { 
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgba(255,255,255,.35);
+}
+
+.card { border: 0; box-shadow: var(--card-shadow); border-radius: 16px; }
+.card-header { background: transparent; border-bottom: 0; font-weight: 600; }
+
+.stats-card h4 { margin-bottom: 2px; }
+
+.log-container { border-radius: 14px !important; }
+
+/* 统一按钮视觉规范（留白更清、色彩更柔） */
+.btn {
+  border: none !important;
+  border-radius: var(--btn-radius) !important;
+  height: var(--btn-height);
+  line-height: calc(var(--btn-height) - 2px);
+  padding: 0 14px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: var(--btn-shadow);
+  transition: transform .04s ease, filter .12s ease, box-shadow .12s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn i { margin-right: .5rem; }
+.btn.btn-sm { height: 36px; line-height: 34px; padding: 0 12px; }
+.sidebar .btn { width: 100%; }
+.sidebar .btn + .btn { margin-top: 8px; }
+
+.btn-primary { background: linear-gradient(135deg, var(--c-primary-1), var(--c-primary-2)) !important; }
+.btn-secondary { background: linear-gradient(135deg, var(--c-secondary-1), var(--c-secondary-2)) !important; }
+.btn-success { background: linear-gradient(135deg, var(--c-success-1), var(--c-success-2)) !important; }
+.btn-info { color: #fff !important; background: linear-gradient(135deg, var(--c-info-1), var(--c-info-2)) !important; }
+.btn-warning { color: #1f2937 !important; background: linear-gradient(135deg, var(--c-warning-1), var(--c-warning-2)) !important; }
+.btn-danger { background: linear-gradient(135deg, var(--c-danger-1), var(--c-danger-2)) !important; }
+
+.btn:hover { filter: brightness(1.03) saturate(1.02); }
+.btn:disabled { filter: grayscale(.15) brightness(.95); }
+
+.toolbar .btn { min-width: 42px; }
+
+/* 表格 & 表单微调 */
+.table thead th { border-top: 0; }
+.form-floating > label { opacity: .7; }
+
+/* 侧边导航更简洁 */
+.sidebar { box-shadow: var(--card-shadow); border-radius: 16px; }
+.sidebar .nav-link { color: #475569; border-radius: 10px; margin: 2px 8px; padding: 10px 12px; }
+.sidebar .nav-link.active { background: rgba(99,102,241,.12); color: #4f46e5; font-weight: 700; } 
+
+/* ===== 按钮无底色（Outline / Ghost）主题覆盖 ===== */
+/* 统一将按钮改为透明底色 + 描边配色，更轻盈的视觉 */
+.btn {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(15,23,42,.15) !important; /* slate-900/15 */
+  color: #334155; /* slate-700 */
+}
+.btn:hover { filter: none; }
+.btn:disabled { opacity: .55; filter: none; }
+
+/* 颜色变体：文字/描边采用主色，悬停时加极浅底色提升可点击性 */
+.btn-primary {
+  color: var(--c-primary-1) !important;
+  border-color: var(--c-primary-1) !important;
+}
+.btn-primary:hover { background: rgba(91,103,241,.08) !important; }
+
+.btn-secondary {
+  color: var(--c-secondary-1) !important;
+  border-color: var(--c-secondary-1) !important;
+}
+.btn-secondary:hover { background: rgba(71,85,105,.08) !important; }
+
+.btn-success {
+  color: var(--c-success-1) !important;
+  border-color: var(--c-success-1) !important;
+}
+.btn-success:hover { background: rgba(34,197,94,.08) !important; }
+
+.btn-info {
+  color: var(--c-info-1) !important;
+  border-color: var(--c-info-1) !important;
+}
+.btn-info:hover { background: rgba(6,182,212,.08) !important; }
+
+.btn-warning {
+  color: var(--c-warning-1) !important;
+  border-color: var(--c-warning-1) !important;
+}
+.btn-warning:hover { background: rgba(245,158,11,.10) !important; }
+
+.btn-danger {
+  color: var(--c-danger-1) !important;
+  border-color: var(--c-danger-1) !important;
+}
+.btn-danger:hover { background: rgba(239,68,68,.08) !important; }
+
+/* 小尺寸工具按钮在透明主题下的高度/间距微调 */
+.toolbar .btn { min-width: 40px; height: 36px; line-height: 34px; }
+/* 侧栏按钮全宽但保持轻量化 */
+.sidebar .btn { width: 100%; border-width: 1px; } 
