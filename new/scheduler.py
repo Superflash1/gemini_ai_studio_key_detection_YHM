@@ -535,6 +535,10 @@ class KeyChecker:
                             # 检查停止请求
                             if self._stop_requested:
                                 self.logger.warning(f"🛑 持续检测被停止！已处理 {processed_count}/{total_count} 个密钥")
+                                # 取消剩余任务，加速停止响应
+                                for remaining_future in future_to_key:
+                                    if not remaining_future.done():
+                                        remaining_future.cancel()
                                 break
                             
                             api_key = future_to_key[future]

@@ -524,19 +524,17 @@ def get_stats_data():
     }
 
 def check_new_keys_async(keys):
-    """异步检测新添加的密钥"""
-    # 检查是否正在进行其他检测
+    """异步检测新添加的密钥：改为触发并发批量检测pending密钥，统一进度条输出"""
+    # 如果已有检测在进行，直接记录并返回
     if scheduler_instance and scheduler_instance.is_checking():
-        # 如果正在检测，记录日志但不执行
         with app.app_context():
             logger = logging.getLogger('KeyChecker')
             logger.warning("⚠️ 新密钥检测被跳过：另一个检测进程正在运行中")
         return
-    
-    for key_value in keys:
-        key_value = key_value.strip()
-        if key_value and scheduler_instance:
-            scheduler_instance.check_single_key(key_value)
+
+    # 触发批量pending并发检测（统一进度条与并发数设置）
+    if scheduler_instance:
+        threading.Thread(target=scheduler_instance._check_pending_keys_async, daemon=True).start()
 
 # 优雅关闭
 import atexit
