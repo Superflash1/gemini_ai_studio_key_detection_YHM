@@ -53,8 +53,8 @@
 
     // 定时器
     setInterval(refreshKeyList, 10000);
-    setInterval(updateStats, 10000);
-    setInterval(checkStatus, 2000);
+    setInterval(updateStats, 3000);
+    setInterval(checkStatus, 1500);
   }
 
   function bindActions() {

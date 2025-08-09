@@ -124,31 +124,31 @@
                                     <small class="text-success">有效 <span id="validPercent">0%</span></small>
                                     <small class="text-danger">无效 <span id="invalidPercent">0%</span></small>
                                 </div>
-                            </div>
                         </div>
                     </div>
+                </div>
 
                     <!-- 添加密钥卡片 -->
-                    <div class="card mb-4">
+                <div class="card mb-4">
                         <div class="card-header bg-white">
                             <h6 class="mb-0"><i class="bi bi-plus-circle"></i> 添加密钥</h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="addKeyForm">
-                                <div class="form-floating mb-3">
-                                    <textarea class="form-control" id="newKeys" placeholder="请输入密钥"></textarea>
+                    </div>
+                    <div class="card-body">
+                        <form id="addKeyForm">
+                            <div class="form-floating mb-3">
+                                <textarea class="form-control" id="newKeys" placeholder="请输入密钥"></textarea>
                                     <label for="newKeys">密钥列表（每行一个，或用逗号分隔）</label>
-                                </div>
-                                <div class="form-text mb-3">
+                            </div>
+                            <div class="form-text mb-3">
                                     💡 支持多种格式，自动去除多余空格和末尾逗号
-                                </div>
+                            </div>
                                 <div class="d-grid d-sm-flex gap-2">
                                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> 添加并检测</button>
                                     <button type="button" class="btn btn-secondary" onclick="window.checkAllKeys()"><i class="bi bi-arrow-clockwise"></i> 按策略检测</button>
-                                </div>
-                            </form>
-                        </div>
+                            </div>
+                        </form>
                     </div>
+                </div>
 
                     <!-- 检测状态与日志 -->
                     <div class="row g-3" id="section-logs">
@@ -227,12 +227,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="scheduleForm">
+                        <form id="scheduleForm">
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
                                 <div class="form-floating">
                                     <input type="number" class="form-control" id="intervalMinutes" value="{{ settings.check_interval or 60 }}" min="0" step="1" />
-                                    <label for="intervalMinutes">检测间隔（分钟，0=禁用）</label>
+                                <label for="intervalMinutes">检测间隔（分钟，0=禁用）</label>
                                 </div>
                             </div>
                             <div class="col-12 col-md-6">
@@ -262,11 +262,11 @@
                             </div>
                             <div class="col-12">
                                 <div class="form-floating">
-                                    <select class="form-select" id="checkStrategy">
+                                <select class="form-select" id="checkStrategy">
                                         <option value="all" {{ 'selected' if settings.check_strategy == 'all' else '' }}>全量检测（有效+待检测密钥）</option>
                                         <option value="incremental" {{ 'selected' if settings.check_strategy == 'incremental' else '' }}>增量检测（24小时内未检测的有效密钥）</option>
-                                    </select>
-                                    <label for="checkStrategy">检测策略</label>
+                                </select>
+                                <label for="checkStrategy">检测策略</label>
                                 </div>
                             </div>
                             <div class="col-12">
@@ -292,8 +292,8 @@
                                     <div class="form-floating mb-2">
                                         <input type="password" class="form-control" id="emailPassword" value="{{ settings.email_password or '' }}" placeholder="Gmail应用密码" />
                                         <label for="emailPassword">Gmail应用密码</label>
-                                    </div>
-                                    <div class="d-grid gap-2">
+                            </div>
+                            <div class="d-grid gap-2">
                                         <button type="button" class="btn btn-info btn-sm" onclick="window.sendTestEmail()"><i class="bi bi-envelope-check"></i> 发送测试邮件</button>
                                     </div>
                                 </div>

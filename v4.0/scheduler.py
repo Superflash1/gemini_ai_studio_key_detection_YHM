@@ -369,6 +369,8 @@ class KeyChecker:
                             # 检查停止请求
                             if self._stop_requested:
                                 self.logger.warning(f"🛑 检测被用户停止！已处理 {processed_count}/{total_count} 个密钥")
+                                # 最后一帧进度刷新
+                                self._log_progress_update(processed_count, total_count, valid_count, invalid_count)
                                 # 取消剩余的任务
                                 for remaining_future in future_to_key:
                                     if not remaining_future.done():
@@ -423,6 +425,8 @@ class KeyChecker:
                     db.session.commit()
                     
                     # 检查是否被停止
+                    # 强制刷新最终进度
+                    self._log_progress_update(processed_count, total_count, valid_count, invalid_count)
                     if self._stop_requested:
                         self.logger.info(f"🛑 检测已停止！部分完成: {processed_count}/{total_count} 个密钥，有效: {valid_count} 个，无效: {invalid_count} 个")
                     else:
@@ -535,6 +539,8 @@ class KeyChecker:
                             # 检查停止请求
                             if self._stop_requested:
                                 self.logger.warning(f"🛑 持续检测被停止！已处理 {processed_count}/{total_count} 个密钥")
+                                # 最后一帧进度刷新
+                                self._log_progress_update(processed_count, total_count, valid_count, invalid_count)
                                 # 取消剩余任务，加速停止响应
                                 for remaining_future in future_to_key:
                                     if not remaining_future.done():
@@ -588,6 +594,8 @@ class KeyChecker:
                     
                     db.session.commit()
                     
+                    # 强制刷新最终进度
+                    self._log_progress_update(processed_count, total_count, valid_count, invalid_count)
                     # 检查是否被停止
                     if self._stop_requested:
                         self.logger.info(f"🛑 持续检测已停止！部分完成: {processed_count}/{total_count} 个密钥，有效: {valid_count} 个，无效: {invalid_count} 个")

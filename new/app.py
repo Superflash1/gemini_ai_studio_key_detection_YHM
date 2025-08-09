@@ -108,7 +108,14 @@ def index():
 @app.route('/logs')
 def logs():
     """实时日志流 (Server-Sent Events)"""
-    return Response(get_log_stream(), content_type='text/event-stream')
+    # 禁用代理/缓存，降低延迟
+    headers = {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'X-Accel-Buffering': 'no'
+    }
+    return Response(get_log_stream(), headers=headers)
 
 # API 路由
 @app.route('/api/keys', methods=['GET'])
