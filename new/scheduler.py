@@ -140,14 +140,24 @@ class KeyChecker:
             if not email_enabled:
                 return  # 邮件通知未启用
             
-            email_receiver_setting = Settings.query.filter_by(key='email_receiver').first()
-            email_receiver = email_receiver_setting.value if email_receiver_setting else ""
-            
+            # 获取应用密码
             email_password_setting = Settings.query.filter_by(key='email_password').first()
             email_password = email_password_setting.value if email_password_setting else ""
             
-            if not email_receiver or not email_password:
-                self.logger.warning("📧 邮件通知已启用但缺少必要配置（接收邮箱或应用密码）")
+            # 获取接收邮箱列表（兼容 email1/email2/email3）
+            receivers = []
+            try:
+                from app import email_notifier
+                if email_notifier:
+                    receivers = email_notifier._get_email_receivers()
+            except Exception:
+                receivers = []
+            
+            if not receivers:
+                self.logger.warning("📧 邮件通知已启用但未配置接收邮箱（请在设置中填写 email1/email2/email3）")
+                return
+            if not email_password:
+                self.logger.warning("📧 邮件通知已启用但缺少应用密码")
                 return
             
             # 计算运行时长
@@ -169,7 +179,7 @@ class KeyChecker:
             # 异步发送邮件（避免阻塞检测流程）
             threading.Thread(
                 target=self._send_email_async,
-                args=(email_receiver, email_password, check_results, check_type)
+                args=("__MULTI__", email_password, check_results, check_type)
             ).start()
             
         except Exception as e:
@@ -183,6 +193,7 @@ class KeyChecker:
             from app import email_notifier
             
             if email_notifier:
+                # 当 receiver_email 为特殊标识时，内部会读取 email1/email2/email3 列表
                 success, message = email_notifier.send_check_result_email(
                     receiver_email=receiver_email,
                     app_password=app_password,
@@ -191,7 +202,7 @@ class KeyChecker:
                 )
                 
                 if success:
-                    self.logger.info(f"📧 检测报告邮件发送成功至 {receiver_email}")
+                    self.logger.info("📧 检测报告邮件发送成功（多收件人）")
                 else:
                     self.logger.error(f"📧 检测报告邮件发送失败: {message}")
             else:

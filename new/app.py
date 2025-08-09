@@ -8,6 +8,9 @@ import threading
 from datetime import datetime
 import os
 import logging
+import sqlite3
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 app = Flask(__name__)
 
@@ -15,6 +18,27 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gemini_keys.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your-secret-key-here'
+# 提高SQLite在多线程场景下的稳定性
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'connect_args': {
+        'check_same_thread': False,
+        'timeout': 30
+    }
+}
+
+# 为SQLite启用WAL等PRAGMA，提升并发读写能力
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA synchronous=NORMAL;")
+            cursor.execute("PRAGMA temp_store=MEMORY;")
+            cursor.execute("PRAGMA foreign_keys=ON;")
+        finally:
+            cursor.close()
 
 # 初始化数据库
 db.init_app(app)
@@ -32,11 +56,11 @@ def create_tables():
         default_settings = {
             'check_interval': ('60', '检测间隔（分钟）'),
             'proxy_url': ('http://127.0.0.1:7890', '代理服务器地址'),
-            'use_proxy': ('true', '是否使用代理'),
+            'use_proxy': ('false', '是否使用代理'),
             'api_url': ('', 'API端点URL（留空使用Google官方API）'),
-            'concurrency': ('10', '并发检测数'),
-            'email_enabled': ('false', '是否启用邮件通知'),
-            'email1': ('', '邮箱地址1'),
+            'concurrency': ('100', '并发检测数'),
+            'email_enabled': ('true', '是否启用邮件通知'),
+            'email1': ('yhm200618@163.com', '邮箱地址1'),
             'email2': ('', '邮箱地址2'), 
             'email3': ('', '邮箱地址3'),
             'email_password': ('', 'Gmail应用密码'),

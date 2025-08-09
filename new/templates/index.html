@@ -84,6 +84,15 @@
                                 <small class="text-muted">待检测</small>
                             </div>
                         </div>
+                        <div class="mt-2">
+                            <div class="stat-progress">
+                                <div id="statProgressFill" class="stat-progress-fill"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-success">有效 <span id="validPercent">0%</span></small>
+                                <small class="text-danger">无效 <span id="invalidPercent">0%</span></small>
+                            </div>
+                        </div>
                         <!-- 添加删除无效密钥按钮 -->
                         <div class="row mt-3">
                             <div class="col-12">
@@ -261,21 +270,7 @@
             <!-- 右侧主要内容 -->
             <div class="col-md-8">
                 <div class="row g-3">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">📊 统计信息</h5>
-                                <div id="stats-content">
-                                    <p class="mb-1">总密钥数: <span id="total-keys">{{ stats.total }}</span></p>
-                                    <p class="mb-1">有效密钥: <span id="valid-keys" class="text-success">{{ stats.valid }}</span></p>
-                                    <p class="mb-1">无效密钥: <span id="invalid-keys" class="text-danger">{{ stats.invalid }}</span></p>
-                                    <p class="mb-0">待检测: <span id="pending-keys" class="text-warning">{{ stats.pending }}</span></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title">🔍 检测状态</h5>
@@ -446,8 +441,7 @@
             checkStatus();
             setInterval(checkStatus, 2000); // 每2秒检查一次状态
             
-            // 启动统计信息更新
-            setInterval(loadStats, 10000); // 每10秒更新一次统计
+            // 移除重复的 loadStats 定时器（统计已由 updateStats 统一处理）
             
             // 初始化邮箱数量显示和监听
             updateEmailCount();
@@ -885,6 +879,19 @@
                 document.getElementById('validCount').textContent = stats.valid_count;
                 document.getElementById('invalidCount').textContent = stats.invalid_count;
                 document.getElementById('pendingCount').textContent = stats.pending_count;
+
+                const total = (stats.valid_count || 0) + (stats.invalid_count || 0) + (stats.pending_count || 0);
+                const validPct = total > 0 ? Math.round((stats.valid_count / total) * 100) : 0;
+                const invalidPct = total > 0 ? Math.round((stats.invalid_count / total) * 100) : 0;
+                const progressFill = document.getElementById('statProgressFill');
+                const validPercent = document.getElementById('validPercent');
+                const invalidPercent = document.getElementById('invalidPercent');
+                if (progressFill) {
+                    const processedPct = total > 0 ? Math.round(((stats.valid_count + stats.invalid_count) / total) * 100) : 0;
+                    progressFill.style.width = `${processedPct}%`;
+                }
+                if (validPercent) validPercent.textContent = `${validPct}%`;
+                if (invalidPercent) invalidPercent.textContent = `${invalidPct}%`;
             } catch (error) {
                 console.error('更新统计信息失败:', error);
             }
